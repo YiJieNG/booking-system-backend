@@ -1,0 +1,5 @@
+Flask
+Flask-Cors
+mysqlclient
+python-dotenv
+gunicorn
