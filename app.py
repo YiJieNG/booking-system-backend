@@ -131,11 +131,11 @@ def get_booking():
     data = request.get_json()
 
     # Check if required fields are provided
-    ref_number = data.get('ref_number')
+    ref_num = data.get('ref_num')
 
     # Validate inputs
-    if not ref_number:
-        return jsonify({"error": "ref_number are required"}), 400
+    if not ref_num:
+        return jsonify({"error": "ref_num are required"}), 400
 
     try:
         # Connect to the database
@@ -145,7 +145,7 @@ def get_booking():
         # Insert booking details into the database
         query = '''select phone, email, bkg_date, bkg_time, table_num from booking WHERE ref_num = %s
                 '''
-        cur.execute(query, (ref_number,))
+        cur.execute(query, (ref_num,))
 
         data = cur.fetchall()
         cur.close()
@@ -179,6 +179,72 @@ def get_booking():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/updateBooking', methods=['PUT'])
+def booking():
+    # Retrieve data from the request
+    data = request.get_json()
+
+    # Check if required fields are provided
+    bkg_date = data.get('bkg_date')
+    bkg_time = data.get('bkg_time')
+    phone = data.get('phone')
+    email = data.get('email')
+    table_num = data.get('table', 0)  # Default to 0 if not provided
+    ref_num = data.get('ref_num')
+
+    # Validate inputs
+    if not ref_num:
+        return jsonify({"error": "ref_number are required"}), 400
+    
+    if not bkg_date and not bkg_time and not phone and not email and not table_num:
+        return jsonify({"error": "at least one parameter to update is required"}), 400
+
+    try:
+        # Connect to the database
+        db = get_db_connection()
+        cur = db.cursor()
+
+        # query = '''INSERT INTO booking (phone, email, bkg_date, bkg_time, table_num, ref_num)
+        #         VALUES (%s, %s, %s, %s, %s, %s)
+        #         '''
+        query = "UPDATE booking SET "
+        params = []
+
+        if email:
+            query += "email = %s, "
+            params.append(email)
+        if phone:
+            query += "phone = %s, "
+            params.append(phone)
+        if table_num:
+            query += "table_num = %s, "
+            params.append(table_num)
+        if bkg_date:
+            query += "bkg_date = %s, "
+            params.append(bkg_date)
+        if bkg_time:
+            query += "bkg_time = %s, "
+            params.append(bkg_time)
+
+        query = query.rstrip(', ') # Remove the last comma and space
+        query += " WHERE ref_num = %s"
+        params.append(ref_num)
+        print(query)
+        print(params)
+            
+        # Execute the update query
+        cur.execute(query, tuple(params))
+
+        # Commit the transaction
+        db.commit()
+
+        # Return success response
+        return jsonify({"message": "Booking successfully updated"}), 201
+
+    except Exception as e:
+        # Handle any errors that occur during the insertion
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 def generate_ref_number(length=12):
