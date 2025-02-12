@@ -51,7 +51,7 @@ def insert_bkgsession():
     # Check if required fields are provided
     bkg_date = data.get('bkg_date')
     bkg_time = data.get('bkg_time')
-    slot_limit = data.get('slot_limit', 0)  # Default to 0 if not provided
+    slot_limit = data.get('slot_limit', 5)  # Default to 0 if not provided
 
     # Validate inputs
     if not bkg_date or not bkg_time:
