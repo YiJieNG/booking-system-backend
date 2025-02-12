@@ -8,6 +8,7 @@ CREATE TABLE bkgsession (
 CREATE TABLE booking (
   phone VARCHAR(255),
   email VARCHAR(255),
+  family_name VARCHAR(255),
   bkg_date DATE NOT NULL,
   bkg_time TIME NOT NULL,
   table_num INTEGER DEFAULT 0,

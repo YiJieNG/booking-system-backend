@@ -42,6 +42,7 @@ else:
     print("Connection successful")
     connection.close()
 
+############# USER WISE ##################
 @app.route('/api/bkgSession', methods=['POST'])
 def insert_bkgsession():
     # Retrieve data from the request
@@ -90,6 +91,7 @@ def make_booking():
     bkg_time = data.get('bkg_time')
     phone = data.get('phone')
     email = data.get('email')
+    family_name = data.get('family_name')
     table_num = data.get('table', 0)  # Default to 0 if not provided
 
     # Validate inputs
@@ -107,10 +109,10 @@ def make_booking():
         cur = db.cursor()
 
         # Insert booking details into the database
-        query = '''INSERT INTO booking (phone, email, bkg_date, bkg_time, table_num, ref_num)
-                VALUES (%s, %s, %s, %s, %s, %s)
+        query = '''INSERT INTO booking (phone, email, bkg_date, bkg_time, family_name, table_num, ref_num)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 '''
-        cur.execute(query, (phone, email, bkg_date, bkg_time, table_num, ref_number))
+        cur.execute(query, (phone, email, bkg_date, bkg_time, family_name, table_num, ref_number))
 
         # Commit the transaction
         db.commit()
@@ -143,7 +145,7 @@ def get_booking():
         cur = db.cursor()
 
         # Insert booking details into the database
-        query = '''select phone, email, bkg_date, bkg_time, table_num from booking WHERE ref_num = %s
+        query = '''select phone, email, bkg_date, bkg_time, family_name, table_num from booking WHERE ref_num = %s
                 '''
         cur.execute(query, (ref_num,))
 
@@ -155,7 +157,7 @@ def get_booking():
         # Process the result to convert datetime objects to strings
         booking_data = []
         for row in data:
-            phone, email, bkg_date, bkg_time, table_num = row
+            phone, email, bkg_date, bkg_time, family_name, table_num = row
             # Convert datetime to string if necessary
             if isinstance(bkg_date, datetime.date):
                 bkg_date = bkg_date.isoformat()  # Convert date to ISO format string
@@ -167,6 +169,7 @@ def get_booking():
                 "email": email,
                 "bkg_date": bkg_date,
                 "bkg_time": bkg_time,
+                "family_name": family_name,
                 "table_num": table_num
             })
 
@@ -188,6 +191,7 @@ def update_booking():
     bkg_time = data.get('bkg_time')
     phone = data.get('phone')
     email = data.get('email')
+    family_name = data.get('family_name')
     table_num = data.get('table', 0)  # Default to 0 if not provided
     ref_num = data.get('ref_num')
 
@@ -224,6 +228,9 @@ def update_booking():
         if bkg_time:
             query += "bkg_time = %s, "
             params.append(bkg_time)
+        if family_name:
+            query += "family_name = %s, "
+            params.append(family_name)
 
         query = query.rstrip(', ') # Remove the last comma and space
         query += " WHERE ref_num = %s"
