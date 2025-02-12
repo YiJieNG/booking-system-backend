@@ -178,9 +178,8 @@ def get_booking():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/api/updateBooking', methods=['PUT'])
-def booking():
+def update_booking():
     # Retrieve data from the request
     data = request.get_json()
 
@@ -246,8 +245,49 @@ def booking():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/cancelBooking', methods=['DELETE'])
+def cancel_booking():
+    # Retrieve data from the request
+    data = request.get_json()
 
-def generate_ref_number(length=12):
+    # Check if required fields are provided
+    ref_num = data.get('ref_num')
+
+    # Validate inputs
+    if not ref_num:
+        return jsonify({"error": "ref_num is required"}), 400
+
+    try:
+        # Connect to the database
+        db = get_db_connection()
+        cur = db.cursor()
+        # Check if the booking exists
+        query = '''SELECT * FROM booking WHERE ref_num = %s'''
+        cur.execute(query, (ref_num,))
+        booking = cur.fetchone()
+
+        if not booking:
+            # If no booking found with the provided reference number
+            return jsonify({"error": "Booking not found"}), 404
+
+        # If the booking exists, proceed to delete it
+        delete_query = '''DELETE FROM booking WHERE ref_num = %s'''
+        cur.execute(delete_query, (ref_num,))
+
+        # Commit the changes
+        db.commit()
+        cur.close()
+        db.close()
+
+        # Return a success message
+        return jsonify({"message": f"Booking with reference number {ref_num} has been deleted."}), 200
+    except Exception as e:
+        # Handle any errors that occur during the insertion
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+def generate_ref_number(length=6):
     # Create a set of characters (uppercase, lowercase, and digits)
     characters = string.ascii_letters + string.digits
     ref_number = ''.join(secrets.choice(characters) for i in range(length))
