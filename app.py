@@ -42,7 +42,6 @@ else:
     print("Connection successful")
     connection.close()
 
-############# USER WISE ##################
 @app.route('/api/bkgSession', methods=['POST'])
 def insert_bkgsession():
     # Retrieve data from the request
@@ -81,6 +80,7 @@ def insert_bkgsession():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
+############# USER WISE ##################
 @app.route('/api/makeBooking', methods=['POST'])
 def make_booking():
     # Retrieve data from the request
