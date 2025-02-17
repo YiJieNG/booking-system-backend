@@ -5,6 +5,9 @@ import os
 import secrets
 import string
 import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,6 +23,12 @@ MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
 MYSQL_DB = os.getenv('MYSQL_DB')
 MYSQL_PORT = int(os.getenv('MYSQL_PORT'))
 
+# Email configuration
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USER = os.getenv('EMAIL_USER')
+EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
+
 # Function to get a database connection
 def get_db_connection():
     try:
@@ -33,6 +42,157 @@ def get_db_connection():
     except Exception as error:
         # handle the exception
         print("An exception occurred:", error)
+
+def generate_otp():
+    # Generate a 6-digit OTP
+    return ''.join(secrets.choice(string.digits) for i in range(6))
+
+def send_otp_email(email, otp):
+    print(email)
+    print(otp)
+    try:
+        # Create message
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = email
+        msg['Subject'] = "Your Booking Verification Code"
+
+        # Email body
+        body = f"""
+        Hello,
+
+        Your verification code is: {otp}
+
+        This code will expire in 10 minutes.
+
+        If you didn't request this code, please ignore this email.
+
+        Best regards,
+        Your Booking Team
+        """
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Create SMTP session
+        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASSWORD)
+
+        # Send email
+        text = msg.as_string()
+        server.sendmail(EMAIL_USER, email, text)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        return False
+
+@app.route('/api/request-otp', methods=['POST'])
+def request_otp():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+
+        # Generate OTP
+        otp = generate_otp()
+        expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
+        # Store OTP in database
+        db = get_db_connection()
+        cur = db.cursor()
+
+        cur.execute("SELECT 1 FROM otp_verification WHERE email = %s", (email,))
+        email_exists = cur.fetchone()
+
+        # First, invalidate any existing OTPs for this email
+        if email_exists:
+            cur.execute("""
+                UPDATE otp_verification 
+                SET otp = %s, expiry_time = %s, is_valid = 1 
+                WHERE email = %s
+            """, (otp, expiry_time, email,))
+            
+        else:
+        # Insert new OTP
+            cur.execute("""
+                INSERT INTO otp_verification 
+                (email, otp, expiry_time, is_valid) 
+                VALUES (%s, %s, %s, 1)
+            """, (email, otp, expiry_time))
+        
+        db.commit()
+
+        return jsonify({"message": "OTP update to database successfully"}), 200
+
+        # # Send OTP via email
+        # if send_otp_email(email, otp):
+        #     return jsonify({
+        #         "message": "OTP sent successfully",
+        #         "email": email
+        #     }), 200
+        # else:
+        #     db.rollback()
+        #     return jsonify({"error": "Failed to send OTP"}), 500
+
+    except Exception as e:
+        if 'db' in locals():
+            db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'db' in locals():
+            db.close()
+
+@app.route('/api/verify-otp', methods=['POST'])
+def verify_otp():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        otp = data.get('otp')
+        
+        if not email or not otp:
+            return jsonify({"error": "Email and OTP are required"}), 400
+
+        db = get_db_connection()
+        cur = db.cursor()
+
+        # Check OTP validity
+        cur.execute("""
+            SELECT 1 
+            FROM otp_verification 
+            WHERE email = %s 
+                AND otp = %s 
+                AND is_valid = 1 
+                AND expiry_time > NOW()
+            LIMIT 1
+        """, (email, otp))
+
+        result = cur.fetchone()
+
+        if result:
+            # Mark OTP as used
+            cur.execute("""
+                UPDATE otp_verification 
+                SET is_valid = 0 
+                WHERE email = %s
+            """, (email,))
+            
+            db.commit()
+            return jsonify({"message": "OTP verified successfully"}), 200
+        else:
+            return jsonify({"error": "Invalid or expired OTP"}), 400
+
+    except Exception as e:
+        if 'db' in locals():
+            db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'db' in locals():
+            db.close()
 
 # Testing connection on start-up
 connection = get_db_connection()
