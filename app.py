@@ -153,7 +153,10 @@ def verify_otp():
         otp = data.get('otp')
         
         if not email or not otp:
-            return jsonify({"error": "Email and OTP are required"}), 400
+            return jsonify({
+                "success": False,
+                "message": "Email and OTP are required"
+            }), 200  # Always return 200
 
         db = get_db_connection()
         cur = db.cursor()
@@ -180,20 +183,29 @@ def verify_otp():
             """, (email,))
             
             db.commit()
-            return jsonify({"message": "OTP verified successfully"}), 200
+            return jsonify({
+                "success": True,
+                "message": "OTP verified successfully"
+            }), 200
         else:
-            return jsonify({"error": "Invalid or expired OTP"}), 400
+            return jsonify({
+                "success": False,
+                "message": "Invalid or expired OTP"
+            }), 200  # Return 200 even for invalid OTP
 
     except Exception as e:
         if 'db' in locals():
             db.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "success": False,
+            "message": "Server error occurred"
+        }), 200  # Return 200 even for server errors
     finally:
         if 'cur' in locals():
             cur.close()
         if 'db' in locals():
             db.close()
-
+            
 # Testing connection on start-up
 connection = get_db_connection()
 if connection is None:
