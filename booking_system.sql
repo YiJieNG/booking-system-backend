@@ -15,3 +15,11 @@ CREATE TABLE booking (
   ref_num VARCHAR(255) NOT NULL,
   PRIMARY KEY (ref_num)
 );
+
+CREATE TABLE otp_verification (
+  email VARCHAR(255),
+  otp VARCHAR(6),
+  expiry_time DATETIME NOT NULL,
+  is_valid BOOL,
+  PRIMARY KEY (email)
+);
