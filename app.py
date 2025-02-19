@@ -381,16 +381,20 @@ def get_bkg_session():
 
 @app.route('/api/bookingSummary', methods=['GET'])
 def get_booking_summary():
-    # Retrieve data from the request
-    data = request.get_json()
-    
-    # Check if required fields are provided
-    month = data.get('month')
-    year = data.get('year')
+    # Get data from query parameters instead of JSON body
+    month = request.args.get('month')
+    year = request.args.get('year')
     
     # Validate inputs
     if not month or not year:
         return jsonify({"error": "month and year are required"}), 400
+        
+    # Convert to integers since query params come as strings
+    try:
+        month = int(month)
+        year = int(year)
+    except ValueError:
+        return jsonify({"error": "month and year must be valid numbers"}), 400
         
     try:
         # Connect to the database
