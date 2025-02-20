@@ -517,10 +517,7 @@ def make_booking():
 @app.route('/api/getBooking', methods=['GET'])
 def get_booking():
     # Retrieve data from the request
-    data = request.get_json()
-
-    # Check if required fields are provided
-    ref_num = data.get('ref_num')
+    ref_num = request.args.get('ref_num')
 
     # Validate inputs
     if not ref_num:
@@ -539,10 +536,15 @@ def get_booking():
         data = cur.fetchall()
         cur.close()
         db.close()
-        print(data)
+
+        if not data:
+            return jsonify({
+                "success": False,
+                "message": "Invalid Reference Number"
+            }), 200
 
         # Process the result to convert datetime objects to strings
-        booking_data = []
+        booking_data = {}
         for row in data:
             phone, email, bkg_date, bkg_time, family_name, table_num = row
             # Convert datetime to string if necessary
@@ -551,14 +553,15 @@ def get_booking():
             if isinstance(bkg_time, datetime.timedelta):
                 bkg_time = str(bkg_time)  # Convert timedelta to string (e.g., '18:30:00')
             
-            booking_data.append({
+            booking_data = {
+                "success": True,
                 "phone": phone,
                 "email": email,
                 "bkg_date": bkg_date,
                 "bkg_time": bkg_time,
                 "family_name": family_name,
                 "table_num": table_num
-            })
+            }
 
         # Return success response with formatted data
         return jsonify(booking_data), 200
