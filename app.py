@@ -507,7 +507,7 @@ def make_booking():
         db.close()
 
         # Return success response
-        return jsonify({"message": "Session successfully inserted"}), 201
+        return jsonify({"ref_number": ref_number}), 201
 
     except Exception as e:
         # Handle any errors that occur during the insertion
