@@ -518,10 +518,12 @@ def make_booking():
 def get_booking():
     # Retrieve data from the request
     ref_num = request.args.get('ref_num')
+    family_name = request.args.get('family_name')
+    print(ref_num)
 
     # Validate inputs
-    if not ref_num:
-        return jsonify({"error": "ref_num are required"}), 400
+    if not ref_num or not family_name:
+        return jsonify({"error": "ref_num and family_name are both required"}), 400
 
     try:
         # Connect to the database
@@ -529,9 +531,9 @@ def get_booking():
         cur = db.cursor()
 
         # Insert booking details into the database
-        query = '''select phone, email, bkg_date, bkg_time, family_name, table_num from booking WHERE ref_num = %s
+        query = '''select phone, email, bkg_date, bkg_time, family_name, table_num from booking WHERE ref_num = %s AND family_name = %s
                 '''
-        cur.execute(query, (ref_num,))
+        cur.execute(query, (ref_num, family_name,))
 
         data = cur.fetchall()
         cur.close()
@@ -540,7 +542,7 @@ def get_booking():
         if not data:
             return jsonify({
                 "success": False,
-                "message": "Invalid Reference Number"
+                "message": "Invalid Reference Number or Family Name"
             }), 200
 
         # Process the result to convert datetime objects to strings
