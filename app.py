@@ -519,7 +519,6 @@ def get_booking():
     # Retrieve data from the request
     ref_num = request.args.get('ref_num')
     family_name = request.args.get('family_name')
-    print(ref_num)
 
     # Validate inputs
     if not ref_num or not family_name:
@@ -646,11 +645,8 @@ def update_booking():
 
 @app.route('/api/cancelBooking', methods=['DELETE'])
 def cancel_booking():
-    # Retrieve data from the request
-    data = request.get_json()
-
-    # Check if required fields are provided
-    ref_num = data.get('ref_num')
+    # Retrieve params from the request
+    ref_num = request.args.get('ref_num')
 
     # Validate inputs
     if not ref_num:
