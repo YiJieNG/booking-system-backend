@@ -529,9 +529,18 @@ def get_booking():
         db = get_db_connection()
         cur = db.cursor()
 
-        # Insert booking details into the database
-        query = '''select phone, email, bkg_date, bkg_time, family_name, table_num from booking WHERE ref_num = %s AND family_name = %s
-                '''
+        # Modified query to format time without seconds using TIME_FORMAT
+        query = '''
+            SELECT 
+                phone,
+                email,
+                DATE_FORMAT(bkg_date, '%%Y-%%m-%%d') as bkg_date,
+                TIME_FORMAT(bkg_time, '%%H:%%i') as bkg_time,
+                family_name,
+                table_num 
+            FROM booking 
+            WHERE ref_num = %s AND family_name = %s
+        '''
         cur.execute(query, (ref_num, family_name,))
 
         data = cur.fetchall()
@@ -544,15 +553,9 @@ def get_booking():
                 "message": "Invalid Reference Number or Family Name"
             }), 200
 
-        # Process the result to convert datetime objects to strings
         booking_data = {}
         for row in data:
             phone, email, bkg_date, bkg_time, family_name, table_num = row
-            # Convert datetime to string if necessary
-            if isinstance(bkg_date, datetime.date):
-                bkg_date = bkg_date.isoformat()  # Convert date to ISO format string
-            if isinstance(bkg_time, datetime.timedelta):
-                bkg_time = str(bkg_time)  # Convert timedelta to string (e.g., '18:30:00')
             
             booking_data = {
                 "success": True,
