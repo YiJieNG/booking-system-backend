@@ -5,13 +5,18 @@ import os
 import secrets
 import string
 import datetime
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
-load_dotenv()
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+from functools import wraps
+from datetime import datetime, timedelta
 
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -28,6 +33,10 @@ EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USER = os.getenv('EMAIL_USER')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
+
+# JWT Configuration
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')  # Use environment variable in production
+JWT_EXPIRATION_HOURS = 24
 
 # Function to get a database connection
 def get_db_connection():
@@ -575,6 +584,55 @@ def get_booking():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/getAllBookings', methods=['GET'])
+def get_all_bookings():
+    try:
+        # Connect to the database
+        db = get_db_connection()
+        cur = db.cursor()
+
+        # Modified query to format time without seconds using TIME_FORMAT
+        query = '''
+            SELECT 
+                ref_num,
+                phone,
+                email,
+                DATE_FORMAT(bkg_date, '%Y-%m-%d') as bkg_date,
+                TIME_FORMAT(bkg_time, '%H:%i') as bkg_time,
+                family_name,
+                table_num 
+            FROM booking 
+        '''
+        cur.execute(query)
+
+        data = cur.fetchall()
+        cur.close()
+        db.close()
+
+        if not data:
+            return jsonify([]), 200  # Return empty array if no bookings
+
+        bookings = []
+        for row in data:
+            ref_num, phone, email, bkg_date, bkg_time, family_name, table_num = row
+            
+            bookings.append({
+                "ref_num": ref_num,
+                "phone": phone,
+                "email": email,
+                "bkg_date": bkg_date,
+                "bkg_time": bkg_time,
+                "family_name": family_name,
+                "table_num": table_num
+            })
+
+        # Return array of bookings
+        return jsonify(bookings), 200
+
+    except Exception as e:
+        # Handle any errors that occur
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/updateBooking', methods=['PUT'])
 def update_booking():
     # Retrieve data from the request
@@ -728,12 +786,90 @@ def get_slot_limit():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
+# Admin Login Route
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'message': 'Missing username or password'}), 400
+
+    try:
+        # Connect to your database
+        db = get_db_connection()
+        cur = db.cursor()
+
+        # Get admin from database
+        cur.execute('''SELECT * FROM admins WHERE username = %s''', (username,))
+        data = cur.fetchone()
+
+        id, username, my_password, created_at, last_login = data
+
+        admin = {
+            "id": id,
+            "username": username,
+            "password": my_password,
+            "created_at": created_at,
+            "last_login": last_login
+        }
+
+        # Generate token
+        token = jwt.encode({
+            'admin_id': admin['id'],
+            'username': admin['username'],
+            'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+        }, JWT_SECRET_KEY)
+
+        return jsonify({
+            'token': token,
+            'message': 'Login successful'
+        })
+
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'db' in locals():
+            db.close()
 
 def generate_ref_number(length=6):
     # Create a set of characters (uppercase, lowercase, and digits)
     characters = string.ascii_letters + string.digits
     ref_number = ''.join(secrets.choice(characters) for i in range(length))
     return ref_number
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Get token from header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'message': 'Invalid token format'}), 401
+
+        if not token:
+            return jsonify({'message': 'Token is missing'}), 401
+
+        try:
+            # Verify token
+            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+            # You might want to verify the admin exists in database here
+            current_admin = data  # Or fetch admin from database
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Invalid token'}), 401
+
+        return f(current_admin, *args, **kwargs)
+
+    return decorated
 
 if __name__ == '__main__':
     app.run(debug=True)
