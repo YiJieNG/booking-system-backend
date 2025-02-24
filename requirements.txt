@@ -3,3 +3,5 @@ Flask-Cors
 mysqlclient
 python-dotenv
 gunicorn
+bcrypt
+PyJWT

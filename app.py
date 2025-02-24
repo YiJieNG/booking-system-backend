@@ -15,6 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 from functools import wraps
 from datetime import datetime, timedelta
+import bcrypt
 
 load_dotenv()
 
@@ -818,49 +819,46 @@ def token_required(f):
 
     return decorated
 
-# Admin Login Route
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-
+    
     if not username or not password:
         return jsonify({'message': 'Missing username or password'}), 400
-
+    
     try:
-        # Connect to your database
         db = get_db_connection()
         cur = db.cursor()
-
+        
         # Get admin from database
         cur.execute('''SELECT * FROM admins WHERE username = %s''', (username,))
         data = cur.fetchone()
-
-        id, username, my_password, created_at, last_login = data
-
-        admin = {
-            "id": id,
-            "username": username,
-            "password": my_password,
-            "created_at": created_at,
-            "last_login": last_login
-        }
-
-        # Generate token
+        
+        if not data:
+            return jsonify({'message': 'Invalid credentials'}), 401
+            
+        id, username, stored_password_hash, created_at, last_login = data
+        
+        # Verify password using Werkzeug's check_password_hash
+        if not check_password_hash(stored_password_hash, password):
+            return jsonify({'message': 'Invalid credentials'}), 401
+            
         token = jwt.encode({
-            'admin_id': admin['id'],
-            'username': admin['username'],
+            'admin_id': id,
+            'username': username,
             'exp': datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
         }, JWT_SECRET_KEY)
-
+        
         return jsonify({
             'token': token,
             'message': 'Login successful'
         })
-
+        
     except Exception as e:
-        return jsonify({'message': str(e)}), 500
+        print(f"Login error: {e}")  # Log the error for debugging
+        return jsonify({'message': 'An error occurred during login'}), 500
     finally:
         if 'cur' in locals():
             cur.close()
