@@ -99,6 +99,7 @@ def send_otp_email(email, otp):
 def request_otp():
     try:
         data = request.get_json()
+        print(data)
         email = data.get('email')
         
         if not email:
@@ -106,7 +107,7 @@ def request_otp():
 
         # Generate OTP
         otp = generate_otp()
-        expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
+        expiry_time = datetime.now() + timedelta(minutes=10)
         # Store OTP in database
         db = get_db_connection()
         cur = db.cursor()
@@ -265,7 +266,6 @@ else:
 def insert_bkgsession():
     # Retrieve data from the request
     data = request.get_json()
-    
     # Check if required fields are provided
     month = data.get('month')
     year = data.get('year')
@@ -481,6 +481,7 @@ def get_booking_summary():
 def make_booking():
     # Retrieve data from the request
     data = request.get_json()
+    print(data)
 
     # Check if required fields are provided
     bkg_date = data.get('bkg_date')
@@ -644,7 +645,7 @@ def update_booking():
     phone = data.get('phone')
     email = data.get('email')
     family_name = data.get('family_name')
-    table_num = data.get('table', 0)  # Default to 0 if not provided
+    table_num = data.get('table_num', 0)  # Default to 0 if not provided
     ref_num = data.get('ref_num')
 
     # Validate inputs
@@ -819,7 +820,7 @@ def admin_login():
         token = jwt.encode({
             'admin_id': admin['id'],
             'username': admin['username'],
-            'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+            'exp': datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
         }, JWT_SECRET_KEY)
 
         return jsonify({
