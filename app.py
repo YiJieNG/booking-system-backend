@@ -787,6 +787,37 @@ def get_slot_limit():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Get token from header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'message': 'Invalid token format'}), 401
+
+        if not token:
+            return jsonify({'message': 'Token is missing'}), 401
+
+        try:
+            # Verify token
+            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+            # You might want to verify the admin exists in database here
+            current_admin = data  # Or fetch admin from database
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Invalid token'}), 401
+
+        return f(current_admin, *args, **kwargs)
+
+    return decorated
+
 # Admin Login Route
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
@@ -836,41 +867,63 @@ def admin_login():
         if 'db' in locals():
             db.close()
 
+# Protected Admin Route Example
+@app.route('/api/admin/bookings', methods=['GET'])
+@token_required
+def get_admin_bookings(current_admin):
+    try:
+        db = get_db_connection()
+        cur = db.cursor()
+
+        # Modified query to match getAllBookings structure
+        query = '''
+            SELECT 
+                ref_num,
+                phone,
+                email,
+                DATE_FORMAT(bkg_date, '%Y-%m-%d') as bkg_date,
+                TIME_FORMAT(bkg_time, '%H:%i') as bkg_time,
+                family_name,
+                table_num 
+            FROM booking 
+        '''
+        cur.execute(query)
+
+        data = cur.fetchall()
+        
+        if not data:
+            return jsonify([]), 200  # Return empty array if no bookings
+
+        bookings = []
+        for row in data:
+            ref_num, phone, email, bkg_date, bkg_time, family_name, table_num = row
+            
+            bookings.append({
+                "ref_num": ref_num,
+                "phone": phone,
+                "email": email,
+                "bkg_date": bkg_date,
+                "bkg_time": bkg_time,
+                "family_name": family_name,
+                "table_num": table_num
+            })
+
+        return jsonify(bookings), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'db' in locals():
+            db.close()
+            
 def generate_ref_number(length=6):
     # Create a set of characters (uppercase, lowercase, and digits)
     characters = string.ascii_letters + string.digits
     ref_number = ''.join(secrets.choice(characters) for i in range(length))
     return ref_number
 
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        
-        # Get token from header
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            try:
-                token = auth_header.split(" ")[1]
-            except IndexError:
-                return jsonify({'message': 'Invalid token format'}), 401
-
-        if not token:
-            return jsonify({'message': 'Token is missing'}), 401
-
-        try:
-            # Verify token
-            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
-            # You might want to verify the admin exists in database here
-            current_admin = data  # Or fetch admin from database
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Invalid token'}), 401
-
-        return f(current_admin, *args, **kwargs)
-
-    return decorated
 
 if __name__ == '__main__':
     app.run(debug=True)
